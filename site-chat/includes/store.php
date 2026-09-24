@@ -76,7 +76,7 @@ function site_chat_visitor_key() {
 /**
  * 新建会话，返回会话 ID（失败返回 0）。
  */
-function site_chat_session_start( $locale = 'zh', $page = '' ) {
+function site_chat_session_start( $locale = 'zh', $page = '', $entry = 'manual' ) {
 	$id = wp_insert_post(
 		array(
 			'post_type'   => SITE_CHAT_PT_SESSION,
@@ -99,6 +99,7 @@ function site_chat_session_start( $locale = 'zh', $page = '' ) {
 	update_post_meta( $id, '_sc_count', 0 );
 	update_post_meta( $id, '_sc_email', '' );
 	update_post_meta( $id, '_sc_refs', array() );
+	update_post_meta( $id, '_sc_entry', 'auto' === $entry ? 'auto' : 'manual' );
 
 	return (int) $id;
 }

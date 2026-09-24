@@ -84,6 +84,12 @@ function site_chat_widget_config( $locale = null ) {
 		'quick'            => $quick,
 		'showRefs'         => ! empty( $opts['show_refs'] ),
 		'email'            => (string) $opts['fallback_email'],
+		// 自动展开：进站后主动露出来，避免访客不知道有客服
+		'autoOpen'          => ! empty( $opts['auto_open'] ),
+		'autoOpenDelay'     => (int) $opts['auto_open_delay'],
+		'autoOpenFrequency' => (string) $opts['auto_open_frequency'],
+		'autoOpenMobile'    => (string) $opts['auto_open_mobile'],
+		'autoOpenExclude'   => (string) $opts['auto_open_exclude'],
 		'strings'          => site_chat_widget_strings( $locale ),
 	);
 }

@@ -107,6 +107,7 @@ function site_chat_render_list() {
 					<th style="width:150px;">开始时间</th>
 					<th style="width:110px;">访客</th>
 					<th style="width:70px;">语言</th>
+					<th style="width:70px;">展开</th>
 					<th>来源页</th>
 					<th style="width:70px;">消息</th>
 					<th style="width:90px;">状态</th>
@@ -116,7 +117,7 @@ function site_chat_render_list() {
 			</thead>
 			<tbody>
 			<?php if ( ! $query->posts ) : ?>
-				<tr><td colspan="8">还没有会话记录。挂件上线后，访客的每次咨询都会出现在这里。</td></tr>
+				<tr><td colspan="9">还没有会话记录。挂件上线后，访客的每次咨询都会出现在这里。</td></tr>
 			<?php else : ?>
 				<?php foreach ( $query->posts as $post ) : ?>
 					<?php
@@ -124,6 +125,7 @@ function site_chat_render_list() {
 					$st     = site_chat_session_status( $sid );
 					$count  = (int) get_post_meta( $sid, '_sc_count', true );
 					$locale = (string) get_post_meta( $sid, '_sc_locale', true );
+					$entry  = 'auto' === get_post_meta( $sid, '_sc_entry', true ) ? '自动' : '手动';
 					$page   = (string) get_post_meta( $sid, '_sc_page', true );
 					$email  = (string) get_post_meta( $sid, '_sc_email', true );
 					$detail = admin_url( 'admin.php?page=site-chat&session=' . $sid );
@@ -132,6 +134,7 @@ function site_chat_render_list() {
 						<td><?php echo esc_html( get_date_from_gmt( $post->post_date_gmt, 'Y-m-d H:i' ) ); ?></td>
 						<td><?php echo esc_html( substr( (string) get_post_meta( $sid, '_sc_visitor', true ), 0, 6 ) ); ?></td>
 						<td><?php echo 'en' === $locale ? 'EN' : '中文'; ?></td>
+						<td><?php echo esc_html( $entry ); ?></td>
 						<td>
 							<?php if ( $page ) : ?>
 								<a href="<?php echo esc_url( $page ); ?>" target="_blank" rel="noopener"><?php echo esc_html( mb_substr( $page, 0, 60 ) ); ?></a>
@@ -208,6 +211,7 @@ function site_chat_render_session( $session_id ) {
 				<td>
 					开始时间：<?php echo esc_html( get_date_from_gmt( $post->post_date_gmt, 'Y-m-d H:i' ) ); ?>　｜
 					语言：<?php echo 'en' === get_post_meta( $session_id, '_sc_locale', true ) ? 'EN' : '中文'; ?>　｜
+					展开方式：<?php echo 'auto' === get_post_meta( $session_id, '_sc_entry', true ) ? '自动展开' : '访客自己点开'; ?>　｜
 					访客指纹：<?php echo esc_html( substr( (string) get_post_meta( $session_id, '_sc_visitor', true ), 0, 6 ) ); ?>　｜
 					来源页：
 					<?php $page = (string) get_post_meta( $session_id, '_sc_page', true ); ?>

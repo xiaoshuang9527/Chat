@@ -49,6 +49,12 @@ function site_chat_defaults() {
 		'widget_theme'     => '#111827',
 		'quick_questions'  => "有哪些浅色的木纹地板？\n地板防水吗，能用在哪里？\n怎么索取样品？",
 		'show_refs'        => 1,
+		// 自动展开（让访客进站就知道有客服）
+		'auto_open'           => 1,
+		'auto_open_delay'     => 6,
+		'auto_open_frequency' => 'daily',
+		'auto_open_mobile'    => 'scroll',
+		'auto_open_exclude'   => '/privacy,/terms,/cookies',
 		// 英文站文案（留空则回退到上面的中文版）
 		'widget_title_en'    => 'Live Chat',
 		'widget_greeting_en' => 'Hi, I am the ROCOCO assistant. Ask me about colours, sizes, wear layer, suitable spaces, samples or shipping.',
@@ -149,7 +155,7 @@ function site_chat_sanitize_options( $input ) {
 		return $defaults;
 	}
 
-	$texts = array( 'provider', 'base_url', 'api_key', 'model', 'fallback_email', 'widget_title', 'widget_title_en', 'widget_theme', 'widget_position', 'temperature' );
+	$texts = array( 'provider', 'base_url', 'api_key', 'model', 'fallback_email', 'widget_title', 'widget_title_en', 'widget_theme', 'widget_position', 'temperature', 'auto_open_exclude' );
 	foreach ( $texts as $key ) {
 		if ( isset( $input[ $key ] ) ) {
 			$out[ $key ] = trim( sanitize_text_field( wp_unslash( $input[ $key ] ) ) );
@@ -166,20 +172,26 @@ function site_chat_sanitize_options( $input ) {
 		}
 	}
 
-	$ints = array( 'max_tokens', 'history_turns', 'monthly_cap', 'rate_per_min', 'rate_per_day' );
+	$ints = array( 'max_tokens', 'history_turns', 'monthly_cap', 'rate_per_min', 'rate_per_day', 'auto_open_delay' );
 	foreach ( $ints as $key ) {
 		if ( isset( $input[ $key ] ) ) {
 			$out[ $key ] = max( 0, (int) $input[ $key ] );
 		}
 	}
 
-	$bools = array( 'widget_enabled', 'notify_escalate', 'include_draft', 'show_refs' );
+	$bools = array( 'widget_enabled', 'notify_escalate', 'include_draft', 'show_refs', 'auto_open' );
 	foreach ( $bools as $key ) {
 		$out[ $key ] = empty( $input[ $key ] ) ? 0 : 1;
 	}
 
 	if ( ! in_array( $out['widget_position'], array( 'right', 'left' ), true ) ) {
 		$out['widget_position'] = 'right';
+	}
+	if ( ! in_array( $out['auto_open_frequency'], array( 'session', 'daily', 'always' ), true ) ) {
+		$out['auto_open_frequency'] = 'daily';
+	}
+	if ( ! in_array( $out['auto_open_mobile'], array( 'scroll', 'delay', 'off' ), true ) ) {
+		$out['auto_open_mobile'] = 'scroll';
 	}
 
 	return array_merge( $defaults, $out );
@@ -419,6 +431,39 @@ function site_chat_render_settings() {
 							<option value="left" <?php selected( $opts['widget_position'], 'left' ); ?>>左下角</option>
 						</select>
 						主色 <input type="text" class="small-text" name="<?php echo esc_attr( $name ); ?>[widget_theme]" value="<?php echo esc_attr( $opts['widget_theme'] ); ?>" placeholder="#111827" />
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">自动展开</th>
+					<td>
+						<label>
+							<input type="checkbox" name="<?php echo esc_attr( $name ); ?>[auto_open]" value="1" <?php checked( $opts['auto_open'] ); ?> />
+							访客进站后自动展开客服面板（避免访客不知道有客服）
+						</label>
+						<p class="description">
+							延迟 <input type="number" min="0" max="60" class="small-text" name="<?php echo esc_attr( $name ); ?>[auto_open_delay]" value="<?php echo (int) $opts['auto_open_delay']; ?>" /> 秒后展开　｜　频率
+							<select name="<?php echo esc_attr( $name ); ?>[auto_open_frequency]">
+								<option value="session" <?php selected( $opts['auto_open_frequency'], 'session' ); ?>>每次会话一次</option>
+								<option value="daily" <?php selected( $opts['auto_open_frequency'], 'daily' ); ?>>每人每天一次</option>
+								<option value="always" <?php selected( $opts['auto_open_frequency'], 'always' ); ?>>每次访问都展开</option>
+							</select>
+						</p>
+						<p class="description">
+							手机端：
+							<select name="<?php echo esc_attr( $name ); ?>[auto_open_mobile]">
+								<option value="scroll" <?php selected( $opts['auto_open_mobile'], 'scroll' ); ?>>等访客滚动到 30% 再展开（推荐）</option>
+								<option value="delay" <?php selected( $opts['auto_open_mobile'], 'delay' ); ?>>和桌面一样按延迟展开</option>
+								<option value="off" <?php selected( $opts['auto_open_mobile'], 'off' ); ?>>手机端不自动展开，只留气泡</option>
+							</select>
+						</p>
+						<p class="description">
+							不自动展开的页面（路径片段，逗号分隔）：<br />
+							<input type="text" class="large-text" name="<?php echo esc_attr( $name ); ?>[auto_open_exclude]" value="<?php echo esc_attr( $opts['auto_open_exclude'] ); ?>" placeholder="/privacy,/terms,/cookies" />
+						</p>
+						<p class="description">
+							另外两条自动生效的规则：访客<strong>手动收起过</strong>就不再弹（本次会话内）；<strong>已经聊过天</strong>的访客不再自动展开。
+							自动展开时不抢焦点（不弹手机键盘、不跳页面），也不遮罩页面。
+						</p>
 					</td>
 				</tr>
 				<tr>

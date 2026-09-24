@@ -497,3 +497,42 @@ powershell -NoProfile -ExecutionPolicy Bypass -File rococo-build\tools\publish-c
 ### 12.3 踩到的坑
 
 PowerShell 5.1 在 `$ErrorActionPreference = 'Stop'` 下用 `2>&1` 捕获**原生命令**输出，会把 stderr 的每一行当成异常抛出（`NativeCommandError`）——而 git 的进度信息正好写在 stderr，于是 push 明明成功了脚本却报错退出。已在该段临时放宽为 `Continue`、改用 `$LASTEXITCODE` 判定结果。
+
+## 十三、自动展开（2026-09-24 追加）
+
+**需求**：访客进站后主动把客服面板露出来，避免"有人不知道这儿能问"。选定参数：**延迟 6 秒 + 每人每天一次**（B 档）。
+
+### 13.1 行为规则
+
+| 规则 | 行为 | 实现位置 |
+| --- | --- | --- |
+| 触发时机 | 停留 **6 秒**后自动展开（可配 0–60 秒） | `chat-widget.js` `scheduleAutoOpen()` |
+| 频率 | **每人每天一次**（`localStorage` 记时间戳，24 小时）；另有"每次会话一次""每次访问都展开"两档 | 设置页「频率」 |
+| 拒绝即闭嘴 | 访客手动收起过 → **本次会话内**不再自动展开（`sessionStorage`） | `close()` |
+| 已聊过不打扰 | 本地已有会话记录的访客直接跳过 | `autoSkipReason()` → `has-session` |
+| 法务页不弹 | 默认排除 `/privacy`、`/terms`、`/cookies`（可改） | 设置页「不自动展开的页面」 |
+| 手机端 | 默认**滚动到 30% 再展开**，避免一进站盖住首屏；也可选"按延迟"或"只留气泡" | 设置页「手机端」 |
+| 不抢焦点 | 自动展开**不聚焦输入框**（不弹手机键盘、不跳页面）、不遮罩 | `open(silent)` |
+| 一键关闭 | 后台设置里取消勾选即可，无需改代码 | 设置页「自动展开」开关 |
+| 效果可评估 | 会话记 `_sc_entry = auto / manual`，后台列表有「展开」列 | `rest.php` + `admin-chat.php` |
+
+### 13.2 诊断钩子
+
+挂件在根节点上写了 `data-sc-auto` 属性，取值直接说明"为什么弹/为什么没弹"：
+`pending` → `armed:delay` / `armed:scroll` → `fired`，或 `skip:config-off`、`skip:already-open`、`skip:dismissed`、`skip:has-session`、`skip:shown-today`、`skip:shown-session`、`skip:excluded:/privacy`。
+排查时在浏览器控制台执行 `document.querySelector('.sc-root').dataset.scAuto` 即可，不用翻代码。
+
+### 13.3 实测（浏览器逐条验证）
+
+| 场景 | 结果 |
+| --- | --- |
+| 全新访客打开首页 | `fired`，6 秒后面板自动展开，显示问候语 + 3 个快捷问题，**输入框未被聚焦** |
+| 自动展开后提问 | 正常作答；后台该会话 `展开=自动`（会话 #2069） |
+| 同一天第 2 次访问（新标签页） | `skip:shown-today`，不弹；气泡仍在 |
+| 已聊过天的访客 | `skip:has-session`，不弹 |
+| 刷新时面板原本是开着的 | `skip:already-open`，保持展开（不是新触发） |
+| 访问 `/privacy` | `skip:excluded:/privacy`，不弹；气泡仍在 |
+
+### 13.4 注意
+
+前端的挂件配置走 `/wp-json/site-chat/v1/config`，Next 侧做了 `revalidate: 300` 缓存，**改完设置最多 5 分钟生效**；改挂件脚本本身需要同步到前端 `public/site-chat/chat-widget.js`（`install.ps1 -Stage frontend`）。

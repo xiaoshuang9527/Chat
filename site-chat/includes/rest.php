@@ -140,12 +140,15 @@ function site_chat_rest_chat( WP_REST_Request $request ) {
 
 	$incoming = (int) $request->get_param( 'session_id' );
 
+	$entry = (string) $request->get_param( 'entry' );
+	$entry = 'auto' === $entry ? 'auto' : 'manual';
+
 	// 限流：超了不消耗模型，直接给兜底话术
 	if ( ! site_chat_rate_limit_ok( $opts ) ) {
 		return site_chat_rest_reply( $incoming, site_chat_fill( site_chat_opt( $opts, 'busy_reply', $locale ) ), true, array( 'reason' => 'rate_limit' ) );
 	}
 
-	$session_id = ( $incoming && site_chat_session_valid( $incoming ) ) ? $incoming : site_chat_session_start( $locale, $page );
+	$session_id = ( $incoming && site_chat_session_valid( $incoming ) ) ? $incoming : site_chat_session_start( $locale, $page, $entry );
 	if ( ! $session_id ) {
 		return new WP_REST_Response( array( 'ok' => false, 'error' => '会话创建失败，请稍后再试' ), 500 );
 	}

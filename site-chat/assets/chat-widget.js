@@ -22,6 +22,8 @@
   var STORE_SESSION = "site_chat_session";
   var STORE_ESCALATED = "site_chat_escalated";
   var STORE_OPEN = "site_chat_open";
+  var STORE_AUTOSHOWN = "site_chat_autoshown";
+  var STORE_DISMISSED = "site_chat_dismissed";
   var instance = null;
 
   /**
@@ -38,6 +40,8 @@
     var POSITION = cfg.position === "left" ? "left" : "right";
     var sending = false;
     var sessionId = 0;
+    var autoOpened = false;      // 这次对话是不是"自动展开"带起来的（记进会话，便于评估效果）
+    var autoDone = false;        // 本页是否已经自动展开过
     var destroyed = false;
     var root, panel, body, input, sendBtn, bubble, styleEl;
     var docClickHandler = null;
@@ -112,6 +116,8 @@
     function build() {
       root = document.createElement("div");
       root.className = "sc-root sc-pos-" + POSITION;
+      // 自动展开的诊断标记（也方便以后 QA 直接从 DOM 看状态）
+      root.setAttribute("data-sc-auto", "pending");
 
       bubble = document.createElement("button");
       bubble.type = "button";
@@ -157,7 +163,9 @@
       root.appendChild(panel);
       document.body.appendChild(root);
 
-      bubble.addEventListener("click", toggle);
+      bubble.addEventListener("click", function () {
+        toggle();
+      });
       closeBtn.addEventListener("click", close);
       sendBtn.addEventListener("click", submit);
       input.addEventListener("keydown", function (event) {
@@ -181,27 +189,36 @@
       };
       document.addEventListener("click", docClickHandler);
 
-      // 切换语言会重建挂件，原本展开的面板保持展开
+      // 切换语言会重建挂件，原本展开的面板保持展开（静默，不抢焦点）
       if (store(sessionStorage, STORE_OPEN) === "1") {
-        open();
+        open(true);
       }
+
+      scheduleAutoOpen();
     }
 
-    function open() {
+    function open(silent) {
       panel.classList.add("sc-open");
       store(sessionStorage, STORE_OPEN, "1");
+      autoDone = true;
+      markAutoShown();
       if (!body.getAttribute("data-ready")) {
         body.setAttribute("data-ready", "1");
         greeting();
       }
-      setTimeout(function () {
-        input.focus();
-      }, 80);
+      // 自动展开时绝不抢焦点：否则手机端会直接弹键盘、桌面端页面会跳到输入框
+      if (!silent) {
+        setTimeout(function () {
+          input.focus();
+        }, 80);
+      }
     }
 
     function close() {
       panel.classList.remove("sc-open");
       store(sessionStorage, STORE_OPEN, "0");
+      // 访客主动收起过 → 本次会话内不再自动展开（给了明确拒绝就别再弹）
+      store(sessionStorage, STORE_DISMISSED, "1");
     }
 
     function toggle() {
@@ -210,6 +227,119 @@
       } else {
         open();
       }
+    }
+
+    /* ---------- 自动展开 ---------- */
+
+    function isSmallScreen() {
+      return !!(window.matchMedia && window.matchMedia("(max-width: 520px)").matches);
+    }
+
+    function autoFrequency() {
+      var freq = cfg.autoOpenFrequency || "daily";
+      return freq === "session" || freq === "always" ? freq : "daily";
+    }
+
+    function autoStoreType() {
+      return autoFrequency() === "session" ? sessionStorage : localStorage;
+    }
+
+    function markAutoShown() {
+      store(autoStoreType(), STORE_AUTOSHOWN, String(Date.now()));
+    }
+
+    /**
+     * 是否允许在本页自动展开。任何一条不满足就不弹。
+     */
+    function autoSkipReason() {
+      if (!cfg.autoOpen) return "config-off";
+      if (autoDone) return "already-open";
+      if (destroyed) return "destroyed";
+
+      // 本次会话里收起过
+      if (store(sessionStorage, STORE_DISMISSED) === "1") return "dismissed";
+
+      // 已经聊过天的访客不再打扰
+      if (store(localStorage, STORE_SESSION)) return "has-session";
+
+      // 频率控制
+      var freq = autoFrequency();
+      if (freq !== "always") {
+        var last = parseInt(store(autoStoreType(), STORE_AUTOSHOWN) || "0", 10) || 0;
+        if (last) {
+          if (freq === "session") return "shown-session";
+          if (freq === "daily" && Date.now() - last < 24 * 60 * 60 * 1000) return "shown-today";
+        }
+      }
+
+      // 页面排除：法务页这种"来读条文"的地方不弹
+      var exclude = (cfg.autoOpenExclude || "").split(",");
+      var path = window.location.pathname;
+      for (var i = 0; i < exclude.length; i++) {
+        var rule = (exclude[i] || "").trim();
+        if (rule && path.indexOf(rule) !== -1) return "excluded:" + rule;
+      }
+
+      return "";
+    }
+
+    function autoOpenAllowed() {
+      return autoSkipReason() === "";
+    }
+
+    function markAuto(value) {
+      if (root) {
+        root.setAttribute("data-sc-auto", String(value));
+      }
+    }
+
+    function scheduleAutoOpen() {
+      var reason = autoSkipReason();
+      if (reason) {
+        markAuto("skip:" + reason);
+        return;
+      }
+
+      var delayMs = Math.max(0, parseInt(cfg.autoOpenDelay, 10) || 0) * 1000;
+      var mobileMode = cfg.autoOpenMobile || "scroll";
+
+      function fire() {
+        var why = autoSkipReason();
+        if (why) {
+          markAuto("skip:" + why);
+          return;
+        }
+        autoOpened = true;
+        markAuto("fired");
+        open(true);
+      }
+
+      if (isSmallScreen()) {
+        if (mobileMode === "off") return;
+
+        // 移动端默认等访客往下滚一段再展开，避免一进站就盖住首屏
+        if (mobileMode === "scroll") {
+          var scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          if (scrollable <= 0) {
+            markAuto("armed:delay-shortpage");
+            setTimeout(fire, delayMs);   // 页面太短没得滚，退回延时
+            return;
+          }
+          markAuto("armed:scroll");
+          var onScroll = function () {
+            var total = document.documentElement.scrollHeight - window.innerHeight;
+            if (total > 0 && window.scrollY / total >= 0.3) {
+              window.removeEventListener("scroll", onScroll);
+              fire();
+            }
+          };
+          window.addEventListener("scroll", onScroll, { passive: true });
+          return;
+        }
+      }
+
+      markAuto("armed:delay");
+      setTimeout(fire, delayMs);
     }
 
     /* ---------- 消息渲染 ---------- */
@@ -378,7 +508,8 @@
           session_id: sessionId,
           message: text,
           locale: LOCALE,
-          page: window.location.href
+          page: window.location.href,
+          entry: autoOpened ? "auto" : "manual"
         })
       })
         .then(function (response) {
