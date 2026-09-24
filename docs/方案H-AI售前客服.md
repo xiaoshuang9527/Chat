@@ -455,6 +455,7 @@ POST /wp-json/rococo/v1/chat
 | --- | --- |
 | `8a6b9f7` | Initial commit（GitHub 建仓时生成的占位 README） |
 | `e195437` | feat: Site Chat AI 售前客服插件 v1.0.0（20 个文件） |
+| `3deff24` | sync: 从源目录同步（已脱敏）——把站点专属信息换成占位符 |
 
 仓库结构：
 
@@ -468,4 +469,31 @@ integrations/wordpress-bridge/     站点数据 → 知识库 JSON 导出脚本�
 tools/chat-open-and-ask.js         挂件回归验证脚本
 ```
 
-**维护注意**：本仓库里的 `site-chat/` 是**发布副本**，真正的源文件仍在 `rococo-build/plugin/site-chat/`。改代码后需要同步一次（拷到 `dist/Chat/` → commit → push），否则两处会漂移。建议后续加一个同步脚本，或者改动后直接按这个流程走一遍。
+### 12.1 同步脚本（`rococo-build/tools/publish-chat-repo.ps1`）
+
+本仓库里的 `site-chat/` 是**发布副本**，真正的源文件仍在 `rococo-build/` 与 `rococo-site/`。改完源文件后跑一次脚本即可，不要手工拷：
+
+```powershell
+# 只同步 + 脱敏 + 本地提交
+powershell -NoProfile -ExecutionPolicy Bypass -File rococo-build\tools\publish-chat-repo.ps1
+# 同步 + 提交 + 推送（token 走一次性授权头，不写入本机凭据）
+powershell -NoProfile -ExecutionPolicy Bypass -File rococo-build\tools\publish-chat-repo.ps1 -Push -Token <PAT>
+```
+
+脚本四步：**同步 → 脱敏 → 本地提交（无变更则跳过）→ 可选推送**（失败自动重试 3 次）。
+
+### 12.2 为什么脱敏要做进脚本里
+
+站点侧**必须**保留真实兜底邮箱（客户留邮箱那条链路要用），所以脱敏只能落在发布副本上；而只手工改一次发布副本的话，下次同步又会把真实值带回来。因此把脱敏做成同步的一步：
+
+| 规则 | 替换为 |
+| --- | --- |
+| 真实兜底邮箱 | `your@email.com` |
+| 内网地址 `your-site.local(:端口)` | `your-site.local` |
+| `github_pat_*` / `sk-*` 形式的疑似密钥 | `REDACTED` |
+
+首次运行即抓到 5 处（方案文档 1 处、`faq.json` 3 处、`tools/chat-open-and-ask.js` 里的内网地址 1 处）。同时把插件的**默认**兜底邮箱改成通用占位符 `your@email.com`——线上已在数据库里保存真实邮箱，保存值优先于默认值，重新部署后实测线上仍是真实邮箱。
+
+### 12.3 踩到的坑
+
+PowerShell 5.1 在 `$ErrorActionPreference = 'Stop'` 下用 `2>&1` 捕获**原生命令**输出，会把 stderr 的每一行当成异常抛出（`NativeCommandError`）——而 git 的进度信息正好写在 stderr，于是 push 明明成功了脚本却报错退出。已在该段临时放宽为 `Continue`、改用 `$LASTEXITCODE` 判定结果。
