@@ -27,7 +27,8 @@ function site_chat_defaults() {
 		'rate_per_min'     => 10,
 		'rate_per_day'     => 200,
 		// 兜底
-		'fallback_email'   => '3327232445@qq.com',
+		// 通用占位符：这是给"换站复用"用的默认值，本站已在数据库里保存了真实邮箱（保存值优先于默认值）
+		'fallback_email'   => 'your@email.com',
 		'notify_escalate'  => 1,
 		'include_draft'    => 0,
 		// 提示词

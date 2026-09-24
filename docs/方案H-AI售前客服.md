@@ -1,6 +1,6 @@
 # 方案 H：AI 智能售前客服（含现成插件盘点）
 
-> 状态：**路线 3（自建独立插件）已实施（2026-09-24，P1–P3 + P4 兜底）**；P0 决策已定：云端 API + 兜底邮箱 `3327232445@qq.com`；**模型已接通**（DeepSeek `deepseek-chat`，Key 存站点设置、可随时替换）。实施明细见第十一节
+> 状态：**路线 3（自建独立插件）已实施（2026-09-24，P1–P3 + P4 兜底）**；P0 决策已定：云端 API + 兜底邮箱 `your@email.com`；**模型已接通**（DeepSeek `deepseek-chat`，Key 存站点设置、可随时替换）。实施明细见第十一节
 > 登记于项目 AGENTS.md 计划索引
 > 关联：`rc_inquiry` 询价后台、`rococo/v1` REST、方案 A 的产品字段（知识库数据源）
 
@@ -446,3 +446,26 @@ POST /wp-json/rococo/v1/chat
 | Is M0B68 waterproof? What sizes does it come in? | ✅ 英文回答，尺寸与耐磨层引用知识库，价格类明确让客户找销售确认 |
 | 你们提供上门安装服务吗？收费多少 | ✅ **不编价格**：明确说知识库没有相关信息、需要同事确认并请访客留邮箱（`escalate=true`） |
 | 发货运费怎么算 | ✅ 知识库无（FAQ 仍是 draft）→ 不调模型，直接 `no_kb` 转邮件兜底 |
+
+## 十二、代码仓库
+
+插件与方案已发布到：**https://github.com/xiaoshuang9527/Chat**（public，默认分支 `main`）
+
+| 提交 | 内容 |
+| --- | --- |
+| `8a6b9f7` | Initial commit（GitHub 建仓时生成的占位 README） |
+| `e195437` | feat: Site Chat AI 售前客服插件 v1.0.0（20 个文件） |
+
+仓库结构：
+
+```
+README.md                          项目说明、快速开始、接口与数据模型
+site-chat/                         插件本体（含 data/knowledge/faq.json 示例知识库）
+docs/方案H-AI售前客服.md            本方案（含跨站复用、技术选型、实施与实测记录）
+docs/知识库格式说明.md              知识库 JSON 格式
+integrations/nextjs/               无头站接入四文件
+integrations/wordpress-bridge/     站点数据 → 知识库 JSON 导出脚本示例
+tools/chat-open-and-ask.js         挂件回归验证脚本
+```
+
+**维护注意**：本仓库里的 `site-chat/` 是**发布副本**，真正的源文件仍在 `rococo-build/plugin/site-chat/`。改代码后需要同步一次（拷到 `dist/Chat/` → commit → push），否则两处会漂移。建议后续加一个同步脚本，或者改动后直接按这个流程走一遍。

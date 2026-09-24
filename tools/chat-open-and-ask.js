@@ -1,6 +1,6 @@
 /**
  * Open the AI chat widget, ask one question, and report the real page state.
- * Use with: capture.ps1 -Url http://192.168.1.68:3001/ -EvalFile chat-open-and-ask.js -Suffix "-chat"
+ * Use with: capture.ps1 -Url http://your-site.local/ -EvalFile chat-open-and-ask.js -Suffix "-chat"
  *
  * NOTE: keep this file pure ASCII. PowerShell 5.1 reads a .js file without a BOM as ANSI,
  * which would mangle Chinese text before it reaches the page, so the Chinese question
